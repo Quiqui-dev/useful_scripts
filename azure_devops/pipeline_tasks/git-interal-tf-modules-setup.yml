@@ -1,0 +1,13 @@
+parameters:
+  - name: orgName
+    type: string
+    default: ""
+  - name: externalModules
+    type: string
+    default: "" # set to Y when true
+
+steps:
+
+${{if ne(length(parameters.externalModules), 0) }}:
+  - script: |
+      git config --global https://${{ parameters.orgName }}:$(System.AccessToken)/dev.azure.com.insteadOf https://dev.azure.com

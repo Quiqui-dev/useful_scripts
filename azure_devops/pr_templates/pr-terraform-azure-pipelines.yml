@@ -1,0 +1,17 @@
+# This template assumes the use of a self-hosted agent with line of sight to your state backend
+# and a service connection configured with workload identity federation
+# we will assume that any modules being installed are external to your azure devops organisation
+# as to have modules coming from your org, we need to do some magic with git to use a system access token.
+# a task will be written which should allow for you to toggle if modules are being fetched internally or not.
+# This template will assume tf-summarize is installed on the agent machine
+
+trigger: none
+
+# add environments here
+
+# add environment details (agent, state file name, service connection, any dependency)
+
+# add first job (runs a tf fmt -check -resursive and a tf validate)
+
+# add a loop to create new jobs based on each environment for the configuration
+# runs a plan and tf-summarize prior to posting the summary to the PR as a comment

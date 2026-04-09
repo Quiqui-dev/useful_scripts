@@ -1,0 +1,4 @@
+steps:
+  - script: |
+      if exist .terraform del
+      if exist *.hcl del
