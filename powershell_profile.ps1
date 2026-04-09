@@ -24,21 +24,6 @@ if (Get-Module -ListAvailable -Name Az.Account) {
 
 # Figure out how to do the AWS equivalent 
 
-# Find out if the current user identity is elevated (has admin rights)
-$identity = [Security.Principal.WindowsIdentity]::GetCurrent()
-$principal = New-Object Security.Principal.WindowsPrincipal $identity
-$isAdmin = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-
-# If so and the current host is a command line, then change to red color 
-# as warning to user that they are operating in an elevated context
-if (($host.Name -match "ConsoleHost") -and ($isAdmin))
-{
-     $host.UI.RawUI.BackgroundColor = "DarkRed"
-     $host.PrivateData.ErrorBackgroundColor = "White"
-     $host.PrivateData.ErrorForegroundColor = "DarkRed"
-     Clear-Host
-}
-
 # Set your default location to open for the PS Shell
 Set-Location ""
 
@@ -68,7 +53,7 @@ try {
 }
 
 try {
-    $gover = go --version
+    $gover = go version
     Write-Host $gover -ForegroundColor "DarkGray"
     Write-Host ""
 } catch {
@@ -99,7 +84,7 @@ try {
 
 try {
     $nv = node --version
-    Write-Host $nv -ForegroundColor "DarkGray"
+    Write-Host "Node version installed: $nv" -ForegroundColor "DarkGray"
     Write-Host ""
 } catch {
     Write-Host "Node is not installed on this machine" -ForegroundColor "DarkGray"
@@ -109,7 +94,7 @@ try {
 
 try {
     $dnv = dotnet --list-sdks
-    Write-Host $dnv -ForegroundColor "DarkGray"
+    Write-Host "dotnet version installed: $dnv" -ForegroundColor "DarkGray"
     Write-Host ""
 } catch {
     Write-Host "dotnet is not installed on this machine" -ForegroundColor "DarkGray"
@@ -316,9 +301,3 @@ Set-Alias -Name dnf -Value DotnetFmt   -Force
 Set-Alias -Name dnp -Value DotnetPack  -Force
 Set-Alias -Name dnr -Value DotnetRun   -Force
 Set-Alias -Name dnc -Value DotnetClean -Force
-
-
-# We don't need these any more; they were just temporary variables to get to $isAdmin. 
-# Delete them to prevent cluttering up the user profile. 
-Remove-Variable identity
-Remove-Variable principal
