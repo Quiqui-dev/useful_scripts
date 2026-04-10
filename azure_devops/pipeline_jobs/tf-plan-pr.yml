@@ -30,7 +30,7 @@ jobs:
 
       - template: ../pipeline_tasks/git-internal-tf-modules-setup.yml
 
-      - task: ms-devlabs.custom-terraform-tasks.custom-terraform-installer-task.TerraformInstaller
+      - task: ms-devlabs.custom-terraform-tasks.custom-terraform-installer-task.TerraformInstaller@0
         inputs:
           terraformVersion: ${{ parameters.terraformVersion }}
 

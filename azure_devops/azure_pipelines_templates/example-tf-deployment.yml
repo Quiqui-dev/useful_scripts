@@ -1,0 +1,59 @@
+# This template assumes the use of a self-hosted agent with line of sight to your state backend
+# and a service connection configured with workload identity federation
+# we will assume that any modules being installed are external to your azure devops organisation
+# as to have modules coming from your org, we need to do some magic with git to use a system access token.
+# a task will be written which should allow for you to toggle if modules are being fetched internally or not.
+# This template will assume tf-summarize is installed on the agent machine
+
+trigger:
+  - main
+
+# add environments here
+
+parameters:
+  - name: environments
+    displayName: Shortname of the environments
+    type: stringList
+    default: ["dev", "tst", "pre", "prd"]
+    values:
+      - dev
+      - tst
+      - pre
+      - prd
+
+  - name: envDetails
+    displayName: the details required for each environment to be used within the PR
+    type: object
+    default:
+      dev:
+        serviceConn: ""
+        tfStateKey: "dev"
+        agentPool: ""
+        depends: ""
+
+      tst:
+        serviceConn: ""
+        tfStateKey: "tst"
+        agentPool: ""
+        depends: "dev"
+
+      pre:
+        serviceConn: ""
+        tfStateKey: "pre"
+        agentPool: ""
+        depends: "tst"
+
+      prd:
+        serviceConn: ""
+        tfStateKey: "prd"
+        agentPool: ""
+        depends: "pre"
+
+stages:
+  - ${{ each env in parameters.environments }}:
+      - template: ../pipeline_stages/tf-plan-apply-azure.yml
+        parameters:
+          targetEnvironment: ${{ parameters.envDetails[env].tfStateKey }}
+          serviceConnection: ${{ parameters.envDetails[env].serviceConn }}
+          agentPool: ${{ parameters.envDetails[env].agentPool }}
+          depends: ${{ parameters.envDetails[env].depends }}

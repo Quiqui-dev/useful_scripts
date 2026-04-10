@@ -1,0 +1,130 @@
+parameters:
+  - name: agentPool
+    type: string
+  - name: targetEnvironment
+    type: string
+  - name: serviceConnection
+    type: string
+  - name: terraformVersion
+    type: string
+    default: latest
+  - name: depends
+    type: string
+    default: ""
+
+stages:
+  - stage: ${{ replace(parameters.targetEnvironment, '-', '_') }}_Deployment_Init_Plan
+    displayName: ${{ upper(parameters.targetEnvironment) }} Init and Plan
+    ${{ if ne(length(parameters.depends), 0) }}:
+      dependsOn:
+        - ${{ replace(parameters.depends, '-', '_') }}_Deployment_Apply
+    jobs:
+      - deployment: InitAndPlanWithUpload
+        displayName: TF Init and Plan for ${{upper(parameters.targetEnvironment)}}
+        environment: "TF_PLAN" # this is your azure devops pipeline environment, not an actual environment in the cloud
+        pool: ${{parameters.agentPool}}
+        strategy:
+          runOne:
+            deploy:
+              steps:
+                - checkout: self
+
+                - template: ../pipeline_tasks/tf-state-clean.yml
+
+                - template: ../pipeline_tasks/az-cli-fed-cred-init.yml
+                  parameters:
+                    serviceConnection: ${{ parameters.serviceConnection }}
+
+                - template: ../pipeline_tasks/git-credential-cleanup.yml
+
+                - task: ms-devlabs.custom-terraform-tasks.custom-terraform-installer-task.TerraformInstaller@0
+                  inputs:
+                    terraformVersion: ${{ parameters.terraformVersion }}
+
+                - script: |
+                    echo Terraform Version is:
+                    terraform --version
+
+                - template: ../pipeline_tasks/az-cli-tf-init.yml
+                  parameters:
+                    serviceConnection: ${{ parameters.serviceConnection }}
+                    targetEnvironment: ${{ parameters.targetEnvironment }}
+
+                - template: ../pipeline_tasks/az-cli-tf-plan.yml
+                  parameters:
+                    serviceConnection: ${{ parameters.serviceConnection }}
+                    targetEnvironment: ${{ parameters.targetEnvironment }}
+
+                - task: PublishPipelineArtifact@1
+                  displayName: save plan file as artifact
+                  inputs:
+                    targetPath: "./plan/${{parameters.targetEnvironment}}.plan"
+                    artifact: ${{parameters.targetEnvironment}}.plan
+                    publishLocation: "pipeline"
+
+                - task: PublishPipelineArtifact@1
+                  displayName: save .terraform folder as artifact
+                  inputs:
+                    targetPath: ".terraform"
+                    artifact: ${{parameters.targetEnvironment}}.terraform
+                    publishLocation: "pipeline"
+
+                - task: PublishPipelineArtifact@1
+                  displayName: save terraform.lock.hcl file as artifact
+                  inputs:
+                    targetPath: ".terraform.lock.hcl"
+                    artifact: ${{parameters.targetEnvironment}}.terraform.lock.hcl
+                    publishLocation: "pipeline"
+
+                - script: tf-summarize.exe ./plan/${{parameters.targetEnvironment}}.plan
+                  displayName: tf summarize
+                  continueOnError: true
+
+  - stage: ${{ replace(parameters.targetEnvironment, '-', '_') }}_Deployment_Apply
+    displayName: ${{ upper(parameters.targetEnvironment) }} Apply
+    dependsOn:
+      - ${{ replace(parameters.targetEnvironment, '-', '_') }}_Deployment_Init_Plan
+    jobs:
+      - deployment:
+        displayName: TF Apply for ${{upper(parameters.targetEnvironment)}}
+        environment: "TF_APPLY" # this is your azure devops pipeline environment, not an actual environment in the cloud
+        pool: ${{parameters.agentPool}}
+        strategy:
+          runOne:
+            deploy:
+              steps:
+                - checkout: self
+
+                - task: DownloadPipelineArtifact@2
+                  displayName: Download plan
+                  inputs:
+                    buildType: "current"
+                    artifactName: "${{parameters.targetEnvironment}}.plan"
+                    targetPath: "plan"
+
+                - task: DownloadPipelineArtifact@2
+                  displayName: Download .terraform dfirectory
+                  inputs:
+                    buildType: "current"
+                    artifactName: "${{parameters.targetEnvironment}}.terraform"
+                    targetPath: ".terraform"
+
+                - task: DownloadPipelineArtifact@2
+                  displayName: Download terraform.lock.hcl
+                  inputs:
+                    buildType: "current"
+                    artifactName: "${{parameters.targetEnvironment}}.terraform.lock.hcl"
+                    targetPath: "."
+
+                - task: ms-devlabs.custom-terraform-tasks.custom-terraform-installer-task.TerraformInstaller@0
+                  inputs:
+                    terraformVersion: ${{parameters.terraformVersion}}
+
+                - template: ../pipeline_tasks/az-cli-fed-cred-init.yml
+                  parameters:
+                    serviceConnection: ${{parameters.serviceConnection}}
+
+                - template: ../pipeline_tasks/az-cli-tf-apply.yml
+                  parameters:
+                    serviceConnection: ${{parameters.serviceConnection}}
+                    targetEnvironment: ${{parameters.targetEnvironment}}
