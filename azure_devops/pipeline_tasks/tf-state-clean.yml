@@ -1,4 +1,5 @@
 steps:
   - script: |
-      if exist .terraform del
-      if exist *.hcl del
+      if exist .terraform rmdir /s /q .terraform
+      if exist *.lock.hcl del *.locl.hcl
+      if exist plan rmdir /s /q plan

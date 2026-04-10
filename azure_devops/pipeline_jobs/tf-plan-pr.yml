@@ -1,0 +1,49 @@
+parameters:
+  - name: agentPool
+    type: string
+  - name: targetEnvironment
+    type: string
+  - name: serviceConnection
+    type: string
+  - name: terraformVersion
+    type: string
+    default: latest
+  - name: depends
+    type: string
+    default: ""
+
+jobs:
+  - job: "tf_plan_${{ replace(parameters.targetEnvironment, '-', '_') }}"
+    displayName: "Terraform plan ${{ parameters.targetEnvironment }}"
+    ${{ if ne(length(parameters.depends), 0) }}:
+      dependsOn:
+        - ${{ replace( parameters.depends, '-', '_') }}
+    pool: ${{ parameters.agentPool }}
+    steps:
+      - template: ../pipeline_tasks/tf-state-clean.yml
+
+      - template: ../pipeline_tasks/az-cli-fed-cred-init.yml
+        parameters:
+          serviceConnection: ${{ parameters.serviceConnection }}
+
+      - template: ../pipeline_tasks/git-credential-cleanup.yml
+
+      - template: ../pipeline_tasks/git-internal-tf-modules-setup.yml
+
+      - task: ms-devlabs.custom-terraform-tasks.custom-terraform-installer-task.TerraformInstaller
+        inputs:
+          terraformVersion: ${{ parameters.terraformVersion }}
+
+      - template: ../pipeline_tasks/az-cli-tf-init.yml
+        parameters:
+          serviceConnection: ${{ parameters.serviceConnection }}
+          targetEnvironment: ${{ parameters.targetEnvironment }}
+
+      - template: ../pipeline_tasks/az-cli-tf-plan.yml
+        parameters:
+          serviceConnection: ${{ parameters.serviceConnection }}
+          targetEnvironment: ${{ parameters.targetEnvironment }}
+
+      - template: ../pipeline_tasks/write-tf-summarry-comment.yml
+
+      - template: ../pipeline_tasks/git-credential-cleanup.yml

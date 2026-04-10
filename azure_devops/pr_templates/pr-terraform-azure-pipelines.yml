@@ -9,9 +9,73 @@ trigger: none
 
 # add environments here
 
-# add environment details (agent, state file name, service connection, any dependency)
+parameters:
+  - name: environments
+    displayName: Shortname of the environments
+    type: stringList
+    default: ["dev", "tst", "pre", "prd"]
+    values:
+      - dev
+      - tst
+      - pre
+      - prd
+
+  # add environment details (agent, state file name, service connection, any dependency)
+
+  - name: envDetails
+    displayName: the details required for each environment to be used within the PR
+    type: object
+    default:
+      dev:
+        serviceConn: ""
+        tfStateKey: "dev"
+        agentPool: ""
+        depends: "tf_lint_validate"
+
+      tst:
+        serviceConn: ""
+        tfStateKey: "tst"
+        agentPool: ""
+        depends: "tf_plan_dev"
+
+      pre:
+        serviceConn: ""
+        tfStateKey: "pre"
+        agentPool: ""
+        depends: "tf_plan_tst"
+
+      prd:
+        serviceConn: ""
+        tfStateKey: "prd"
+        agentPool: ""
+        depends: "tf_plan_pre"
 
 # add first job (runs a tf fmt -check -resursive and a tf validate)
 
+jobs:
+  - job: "tf_lint_validate"
+    pool: ""
+    steps:
+      - template: ../pipeline_tasks/git-credential-cleanup.yml
+
+      - template: ../pipeline_tasks/write-pr-comment.yml
+        runCondition: eq(variables['System.PullRequest.PullRequestIteration'], '1')
+        commentText: |
+          Please fully review this PR, amend this text as required.
+
+      - template: ../pipeline_tasks/git-internal-tf-modules-setup.yml
+
+      - template: ../pipeline_tasks/tf-lint-validate.yml
+
+      - template: ../pipeline_tasks/git-credential-cleanup.yml
+
 # add a loop to create new jobs based on each environment for the configuration
 # runs a plan and tf-summarize prior to posting the summary to the PR as a comment
+
+- ${{ each env in parameters.environments }}:
+  - template: ../pipeline_jobs/tf-pr-plan-job.yml
+    parameters:
+      targetEnvironment: ${{ parameters.envDetails[env].tfStateKey }}
+      serviceConnection: ${{ parameters.envDetails[env].serviceConn }}
+      agentPool: ${{ parameters.envDetails[env].agentPool }}
+      depends: ${{ parameters.envDetails[env].depends }}

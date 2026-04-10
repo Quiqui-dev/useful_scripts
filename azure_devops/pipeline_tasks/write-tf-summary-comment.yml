@@ -1,0 +1,42 @@
+parameters:
+  - name: targetEnvironment
+    type: string
+  - name: runCondition
+    type: string
+    default: ""
+
+steps:
+  - task: Powershell@2
+    displayName: Post Comment On PR
+    ${{ if (ne(length(parameters.runCondition), 0)) }}:
+      condition: ${{ (parameters.runCondition }}
+    inputs:
+      failOnStderr: true
+      targetType: "inline"
+      script: |
+
+        $summary = tf-summarize.exe -md -out="${{ parameters.targetEnvironment }}.plan.md" ./plan/${{parameters.targetEnvironment}}.plan
+
+        $content = Get-Content -Path "${{parameters.targetEnvironment}}.plan.md" -Raw
+
+        $comment = @"
+        **TARGET ENVIRONMENT ${{ upper(parameters.targetEnvironment) }}**
+        $content
+        "@
+
+        $request = @"
+        {
+          "comments": [
+            {
+              "parentCommentId": 0,
+              "content": '$comment',
+              "commentType": 1
+            } 
+          ],
+          "status": 1
+        }
+        "@
+        $contentType = "application/json"
+        $headers = @{ Authorization = 'Bearer $(System.AccessToken)' }
+        $uri = "$(System.CollectionUri)$(System.TeamProject)/_apis/git/repositories/$(Build.Repository.Name)/pullRequests/$(System.PullRequest.PullRequestId)/threads?api-version=5.1"
+        Invoke-RestMethod -uri $uri -method POST -Headers $headers -ContentType $contentType -Body $request
